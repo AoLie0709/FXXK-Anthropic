@@ -1,0 +1,1 @@
+scripts/claude_network_guard.py

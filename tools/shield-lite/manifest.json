@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Claude Shield Lite (Zero-Footprint)",
+  "version": "2.0.0",
+  "description": "只做 WebRTC 防泄漏的零注入护盾：无内容脚本、无请求头改写、无指纹 Hook。语言与时区由操作系统与浏览器原生设置决定。",
+  "permissions": [
+    "privacy",
+    "storage"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Shield Lite"
+  }
+}

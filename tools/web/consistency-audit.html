@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Claude 环境一致性体检</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1d2129; --line:#2a2f3a;
+    --fg:#e6e9ef; --dim:#8b93a7; --ok:#3ecf8e; --warn:#f5b942; --bad:#ef5b5b; --info:#5aa9e6;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 72px}
+  h1{font-size:22px;margin:0 0 6px;letter-spacing:.3px}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:22px}
+  .bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:22px}
+  button{background:var(--info);color:#06121d;border:0;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer}
+  button.ghost{background:transparent;color:var(--dim);border:1px solid var(--line)}
+  button:disabled{opacity:.5;cursor:default}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin:0 0 12px;font-weight:600}
+  .row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,.05)}
+  .row:last-child{border-bottom:0}
+  .k{color:var(--dim);flex:0 0 auto}
+  .v{font-family:var(--mono);font-size:12.5px;text-align:right;word-break:break-all}
+  .pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:700;font-family:var(--mono)}
+  .p-ok{background:rgba(62,207,142,.14);color:var(--ok)}
+  .p-warn{background:rgba(245,185,66,.14);color:var(--warn)}
+  .p-bad{background:rgba(239,91,91,.14);color:var(--bad)}
+  .p-info{background:rgba(90,169,230,.14);color:var(--info)}
+  .verdict{display:flex;align-items:center;gap:10px;padding:10px 0}
+  .score{font-size:30px;font-weight:800;font-family:var(--mono)}
+  .note{color:var(--dim);font-size:12px;margin-top:10px}
+  .kv{font-family:var(--mono);font-size:12px;color:var(--dim)}
+  code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:12px}
+  .fail{color:var(--bad)} .warn{color:var(--warn)} .ok{color:var(--ok)}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.06)}
+  th{color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  td.mono{font-family:var(--mono);font-size:11.5px}
+  .foot{margin-top:26px;color:var(--dim);font-size:12px;line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Claude 环境一致性体检</h1>
+  <div class="sub">
+    复刻 claude.ai 前端实际使用的判定逻辑（逆向自 <code>shared-l-p-m-0</code>），逐项比对「平台会看到什么」。
+    全部计算在本机完成，<b>不上传任何数据</b>；只有点击「检查出口」时才向公开 IP 库查询一次。
+  </div>
+
+  <div class="bar">
+    <button id="run">重新体检</button>
+    <button id="exit" class="ghost">检查出口 IP / 地区</button>
+    <span id="stamp" class="kv"></span>
+  </div>
+
+  <div class="grid">
+    <div class="card" style="grid-column:1/-1">
+      <h2>平台核心判定（这几项决定你是否"看起来像自动化"）</h2>
+      <div class="verdict">
+        <span id="score" class="score">–</span>
+        <span id="scoretxt" class="note" style="margin:0"></span>
+      </div>
+      <table id="core"><thead><tr><th>字段</th><th>实测值</th><th>期望</th><th>判定</th></tr></thead><tbody></tbody></table>
+      <div class="note" id="corenote"></div>
+    </div>
+
+    <div class="card">
+      <h2>身份与客户端</h2>
+      <div id="ident"></div>
+    </div>
+
+    <div class="card">
+      <h2>语言 / 时区 / 日历</h2>
+      <div id="locale"></div>
+    </div>
+
+    <div class="card">
+      <h2>屏幕与视口</h2>
+      <div id="screen"></div>
+    </div>
+
+    <div class="card">
+      <h2>硬件与性能</h2>
+      <div id="hw"></div>
+    </div>
+
+    <div class="card">
+      <h2>网络与连接</h2>
+      <div id="net"></div>
+    </div>
+
+    <div class="card">
+      <h2>外设 / 存储 / 权限</h2>
+      <div id="misc"></div>
+    </div>
+
+    <div class="card" style="grid-column:1/-1">
+      <h2>三方一致性矩阵（这是最容易露馅的地方）</h2>
+      <table id="matrix"><thead><tr><th>维度</th><th>实测</th><th>一致性</th></tr></thead><tbody></tbody></table>
+      <div class="note">
+        平台在 HTML 里直接注入 <code>data-ion-ip-country</code>（本次 HAR 实测为 <code>TW</code>），
+        并与 <code>cf-ray</code> 机房、页面 locale、<code>Accept-Language</code>、系统时区交叉比对。
+      </div>
+    </div>
+
+    <div class="card" style="grid-column:1/-1">
+      <h2>静默采集清单（平台实际读取、但从不询问你的属性）</h2>
+      <div class="note" style="margin-top:0">
+        以下字段是我们在 178 个前端 bundle 里逐一定位到读取点的；未列出的（WebGL 渲染器、AudioContext、Canvas 哈希、字体枚举）<b>平台并未自研采集</b>，不需要伪造。
+      </div>
+      <div id="silent"></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <b>怎么读结果：</b>红色项意味着平台会拿到一个"矛盾"或"异常"的值，优先修；黄色项是偏好问题；
+    绿色项保持不动。<br>
+    <b>原则：</b>一致性 &gt; 伪装度。所有红色项的正确解法是<b>让真实环境对齐</b>（改系统时区、统一语言、别在怪环境里跑），
+    而不是用脚本伪造另一个值——伪造会被 <code>ua_client_hints</code> / <code>ua_form</code> / <code>device_id_kind</code> 这类归一化器直接标记。<br>
+    本页仅做本地只读采集，不写 Cookie、不改任何设置。
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+ * 1. 逆向移植：claude.ai 前端的真实判定函数
+ * ============================================================ */
+
+// Chrome 版本四段解析
+const RE_CHROME = /(?:^|[^A-Za-z])(?:Headless)?Chrome\/(\d+)\.(\d+)\.(\d+)\.(\d+)/;
+const RE_ELECTRON = /(?:^|[\s)])Electron\//;
+const RE_CLAUDEAPP = /(?:^|[\s)])Claude(?:Nest|Gov)?\//;
+const RE_WEBVIEW = /; wv\)/;
+const RE_PLATFORM = /^Mozilla\/5\.0 \(([^)]*)\)/;
+const MIN_CHROME = 113;
+// 平台允许的 UA 平台串白名单（逆向自 kD）。
+// 注意 macOS 只允许 10_15_7 —— 这是 Chrome UA-Reduction 的冻结值，不是真实系统版本。
+const ALLOWED_PLATFORM = /^(?:Windows NT 10\.0(?:; Win64; x64|; WOW64)?|Macintosh; Intel Mac OS X 10_15_7|X11; Linux x86_64|X11; CrOS [a-z0-9_]+ 14541\.0\.0|Linux; Android 10; K)$/;
+
+function chromeVer(ua) {
+  const m = RE_CHROME.exec(ua || "");
+  return m ? m.slice(1, 5) : undefined;
+}
+
+// ua_form：平台用它判断"你的 UA 是否处于正常的 Chrome UA-Reduction 形态"
+function uaForm(ua) {
+  if (typeof ua !== "string") return "other";
+  if (RE_ELECTRON.test(ua) || RE_CLAUDEAPP.test(ua)) return "electron";
+  if (RE_WEBVIEW.test(ua)) return "webview";
+  const v = chromeVer(ua);
+  if (!v) return "other";
+  if (Number(v[0]) < MIN_CHROME) return "pre_reduction";
+  if (v[1] !== "0" || v[2] !== "0" || v[3] !== "0") return "unreduced_version";
+  const plat = (RE_PLATFORM.exec(ua) || [])[1];
+  return plat !== undefined && ALLOWED_PLATFORM.test(plat) ? "reduced" : "unreduced_platform";
+}
+
+// ua_client_hints：UA 主版本 必须等于 navigator.userAgentData.brands 里 Chromium 的主版本
+function uaClientHints(nav) {
+  const uad = nav?.userAgentData;
+  if (!nav || uad == null) return "absent";
+  const brands = (Array.isArray(uad.brands) ? uad.brands : [])
+    .filter(b => b && typeof b === "object" && typeof b.brand === "string");
+  if (brands.length === 0) return "empty";
+  const v = chromeVer(nav.userAgent || "");
+  const major = v ? Number(v[0]) : undefined;
+  const hit = major !== undefined && brands.some(b =>
+    b.brand === "Chromium" && typeof b.version === "string" && parseInt(b.version, 10) === major);
+  return hit ? "match" : "mismatch";
+}
+
+// screen_equals_viewport：screen 尺寸 == 视口尺寸 → 无头/固定视口的典型特征
+function screenEqualsViewport(win) {
+  try {
+    if (!win) return false;
+    const { innerWidth: w, innerHeight: h } = win;
+    return typeof w === "number" && typeof h === "number" && w > 0 && h > 0 &&
+      win.screen?.width === w && win.screen?.height === h;
+  } catch { return false; }
+}
+
+// is_automation / automation_signal：三类判定
+const RE_BOT = /bot(?:[^a-z0-9]|$)|crawl|spider|slurp|scrape|lighthouse|pagespeed|ptst\/|prerender|google(?:other|-inspectiontool|-read-aloud| favicon)|bingpreview|facebookexternalhit|datadogsynthetics|checkly/i;
+const RE_BOT_EXCLUDE = /cubot/i;
+const RE_HEADLESS = /HeadlessChrome|PhantomJS/;
+
+function automationSignal(nav) {
+  if (!nav) return null;
+  const ua = typeof nav.userAgent === "string" ? nav.userAgent : "";
+  if (RE_BOT.test(ua) && !RE_BOT_EXCLUDE.test(ua)) return "ua_bot";
+  if (RE_HEADLESS.test(ua)) return "ua_headless";
+  if (nav.webdriver === true) return "webdriver";
+  return null;
+}
+
+// hidden_at_load：文档加载时不可见，且不是正常的预渲染激活
+function hiddenAtLoad() {
+  const vd = typeof document !== "undefined" && document.visibilityState === "hidden";
+  let activation = null;
+  try {
+    const nav = performance.getEntriesByType("navigation")[0];
+    if (nav && typeof nav.activationStart === "number" && nav.activationStart > 0) {
+      activation = Math.max(1, Math.round(nav.activationStart));
+    }
+  } catch {}
+  return vd && activation === null;
+}
+
+/* ============================================================
+ * 2. 采集
+ * ============================================================ */
+
+const $ = s => document.querySelector(s);
+function rows(el, arr) {
+  el.innerHTML = arr.map(([k, v, cls]) => {
+    const c = cls ? ` ${cls}` : "";
+    return `<div class="row"><span class="k">${k}</span><span class="v${c}">${v}</span></div>`;
+  }).join("");
+}
+function pill(t) {
+  const map = { ok: "p-ok", warn: "p-warn", bad: "p-bad", info: "p-info" };
+  return `<span class="pill ${map[t] || "p-info"}">${t.toUpperCase()}</span>`;
+}
+const dash = v => (v === undefined || v === null || v === "") ? "—" : String(v);
+// 任何浏览器 API 都可能在某些环境挂起：统一加超时，避免整页卡在 await
+const withTimeout = (p, ms, fb) => Promise.race([
+  Promise.resolve(p).catch(() => fb),
+  new Promise(r => setTimeout(() => r(fb), ms)),
+]);
+
+async function collect() {
+  const nav = navigator;
+  const win = window;
+
+  /* ---- 核心判定 ---- */
+  const form = uaForm(nav.userAgent);
+  const ch = uaClientHints(nav);
+  const seq = screenEqualsViewport(win);
+  const auto = automationSignal(nav);
+  const hidden = hiddenAtLoad();
+  const isElectron = RE_ELECTRON.test(nav.userAgent);
+  const isClaudeApp = !!win.claudeAppBindings || RE_CLAUDEAPP.test(nav.userAgent);
+
+  const items = [
+    ["ua_form", form, "reduced", form === "reduced" ? "ok" : (form === "electron" || form === "webview" ? "info" : "bad")],
+    ["ua_client_hints", ch, "match", ch === "match" ? "ok" : (ch === "absent" ? "warn" : "bad")],
+    ["screen_equals_viewport", String(seq), "false", seq ? "bad" : "ok"],
+    ["is_automation", auto === null ? "false" : "true", "false", auto === null ? "ok" : "bad"],
+    ["automation_signal", dash(auto), "null", auto === null ? "ok" : "bad"],
+    ["hidden_at_load", String(hidden), "false", hidden ? "bad" : "ok"],
+  ];
+  $("#core").querySelector("tbody").innerHTML = items.map(([k, v, exp, cls]) =>
+    `<tr><td class="mono">${k}</td><td class="mono ${cls}">${v}</td><td class="mono" style="color:var(--dim)">${exp}</td><td>${pill(cls)}</td></tr>`
+  ).join("");
+
+  const fails = items.filter(i => i[3] === "bad").length;
+  const warns = items.filter(i => i[3] === "warn").length;
+  const score = Math.max(0, 100 - fails * 25 - warns * 8);
+  $("#score").textContent = score;
+  $("#score").className = "score " + (fails ? "fail" : warns ? "warn" : "ok");
+  $("#scoretxt").textContent = fails
+    ? `${fails} 项会直接被平台标记为异常，务必修复`
+    : warns ? `${warns} 项偏好偏差（非致命）` : "全部核心判定通过";
+
+  let note = "";
+  if (form === "unreduced_version") note += "<br><b>ua_form=unreduced_version</b>：UA 里 Chrome 版本后三段不全为 0，说明 UA 被手工改过或来自非标准客户端。";
+  if (form === "unreduced_platform") note += "<br><b>ua_form=unreduced_platform</b>：UA 平台串不在 Chrome UA-Reduction 白名单内（macOS 必须是 <code>Intel Mac OS X 10_15_7</code>）。";
+  if (ch === "mismatch") note += "<br><b>ua_client_hints=mismatch</b>：UA 主版本与 <code>userAgentData.brands</code> 里的 Chromium 主版本不一致 —— 典型的「只改 UA 没改 client hints」。";
+  if (seq) note += "<br><b>screen_equals_viewport=true</b>：screen 尺寸与视口完全相等，是无头浏览器的标志性特征。";
+  if (auto) note += `<br><b>检测到自动化信号：${auto}</b>。`;
+  if (isClaudeApp) note += "<br>当前运行在 <b>Claude 客户端</b> 内（<code>claudeAppBindings</code> 存在），平台会记录 platform 差异。";
+  $("#corenote").innerHTML = note;
+
+  /* ---- 身份与客户端 ---- */
+  const ua = nav.userAgent;
+  const brands = (nav.userAgentData?.brands || []).map(b => `${b.brand}/${b.version}`).join(" · ") || "—";
+  let highEntropy = "—";
+  try {
+    if (nav.userAgentData?.getHighEntropyValues) {
+      const he = await withTimeout(nav.userAgentData.getHighEntropyValues(
+        ["architecture", "bitness", "model", "platformVersion", "fullVersionList", "uaFullVersion", "wow64"]), 1500, {});
+      highEntropy = [
+        "arch=" + dash(he.architecture), "bits=" + dash(he.bitness),
+        "platformVersion=" + dash(he.platformVersion),
+        "uaFullVersion=" + dash(he.uaFullVersion),
+      ].join(" · ");
+      $("#silent").dataset.he = highEntropy;
+    }
+  } catch (e) { highEntropy = "不可用：" + e.message; }
+
+  rows($("#ident"), [
+    ["User-Agent", ua],
+    ["ua_form（判定）", form],
+    ["Chromium 版本", dash(chromeVer(ua)?.join("."))],
+    ["UA-CH brands", brands],
+    ["高熵值", highEntropy],
+    ["platform", dash(nav.userAgentData?.platform || nav.platform)],
+    ["vendor", dash(nav.vendor)],
+    ["webdriver", String(nav.webdriver)],
+    ["languages", (nav.languages || []).join(", ")],
+    ["硬编码语言", dash(nav.language)],
+    ["客户端内运行", isClaudeApp ? "是（claudeAppBindings）" : "否"],
+  ]);
+
+  /* ---- 语言 / 时区 ---- */
+  const ro = (() => { try { return Intl.DateTimeFormat().resolvedOptions(); } catch { return {}; } })();
+  const offMin = new Date().getTimezoneOffset();
+  const offStr = `${offMin <= 0 ? "+" : "-"}${String(Math.floor(Math.abs(offMin) / 60)).padStart(2, "0")}:${String(Math.abs(offMin) % 60).padStart(2, "0")}`;
+  rows($("#locale"), [
+    ["Intl timeZone", dash(ro.timeZone)],
+    ["UTC 偏移", offStr + "（" + offMin + " 分钟）"],
+    ["Intl locale", dash(ro.locale)],
+    ["calendar", dash(ro.calendar)],
+    ["numberingSystem", dash(ro.numberingSystem)],
+    ["hourCycle", dash(ro.hourCycle)],
+    ["navigator.language", dash(nav.language)],
+    ["navigator.languages", (nav.languages || []).join(", ")],
+    ["本地时间样本", new Date().toLocaleString()],
+  ]);
+
+  /* ---- 屏幕 ---- */
+  const s = win.screen;
+  rows($("#screen"), [
+    ["screen.width × height", `${s.width} × ${s.height}`],
+    ["availWidth × availHeight", `${s.availWidth} × ${s.availHeight}`],
+    ["innerWidth × innerHeight", `${win.innerWidth} × ${win.innerHeight}`],
+    ["outerWidth × outerHeight", `${win.outerWidth} × ${win.outerHeight}`],
+    ["devicePixelRatio", String(win.devicePixelRatio)],
+    ["colorDepth / pixelDepth", `${s.colorDepth} / ${s.pixelDepth}`],
+    ["screen == viewport", String(seq)],
+    ["窗口可装饰差", `${win.outerWidth - win.innerWidth} × ${win.outerHeight - win.innerHeight}`],
+    ["视觉视口", `${Math.round(win.visualViewport?.width || 0)} × ${Math.round(win.visualViewport?.height || 0)}`],
+  ]);
+
+  /* ---- 硬件 ---- */
+  const mem = nav.deviceMemory;
+  const perfMem = performance.memory ? {
+    used: Math.round(performance.memory.usedJSHeapSize / 1048576) + "MB",
+    limit: Math.round(performance.memory.jsHeapSizeLimit / 1048576) + "MB",
+  } : null;
+  let quota = "—";
+  try {
+    if (navigator.storage?.estimate) {
+      const e = await withTimeout(navigator.storage.estimate(), 1500, null);
+      if (e) quota = `${(e.usage / 1048576).toFixed(1)}MB / ${(e.quota / 1024 / 1024 / 1024).toFixed(2)}GB`;
+    }
+  } catch {}
+  rows($("#hw"), [
+    ["hardwareConcurrency", dash(nav.hardwareConcurrency)],
+    ["deviceMemory", dash(mem) + (mem ? " GB" : "")],
+    ["performance.memory", perfMem ? `${perfMem.used} / ${perfMem.limit}` : "—"],
+    ["storage.estimate", quota],
+    ["maxTouchPoints", dash(nav.maxTouchPoints)],
+    ["PDF viewer", dash(nav.pdfViewerEnabled)],
+  ]);
+
+  /* ---- 网络 ---- */
+  const c = nav.connection || nav.mozConnection || nav.webkitConnection;
+  rows($("#net"), [
+    ["connection.effectiveType", dash(c?.effectiveType)],
+    ["connection.downlink", dash(c?.downlink) + (c ? " Mb/s" : "")],
+    ["connection.rtt", dash(c?.rtt) + (c ? " ms" : "")],
+    ["connection.saveData", dash(c?.saveData)],
+    ["onLine", String(nav.onLine)],
+    ["doNotTrack", dash(nav.doNotTrack)],
+    ["cookieEnabled", String(nav.cookieEnabled)],
+    ["出口 IP / 地区", "点上方「检查出口」获取"],
+  ]);
+
+  /* ---- 外设/存储/权限 ---- */
+  let devs = "—";
+  try {
+    const list = await withTimeout(nav.mediaDevices?.enumerateDevices?.() ?? null, 1500, null);
+    if (list) {
+      const cnt = { audioinput: 0, audiooutput: 0, videoinput: 0 };
+      list.forEach(d => { if (cnt[d.kind] !== undefined) cnt[d.kind]++; });
+      devs = `麦克风 ${cnt.audioinput} · 扬声器 ${cnt.audiooutput} · 摄像头 ${cnt.videoinput}`;
+    }
+  } catch {}
+  let perms = [];
+  for (const name of ["geolocation", "notifications", "camera", "microphone", "clipboard-read"]) {
+    try {
+      const st = await withTimeout(navigator.permissions.query({ name }), 800, { state: "unknown" });
+      perms.push(`${name}=${st.state}`);
+    } catch {}
+  }
+  rows($("#misc"), [
+    ["媒体设备", devs],
+    ["权限状态", perms.join(" · ") || "—"],
+    ["localStorage", (() => { try { localStorage.setItem("__t", "1"); localStorage.removeItem("__t"); return "可写"; } catch { return "被禁用"; } })()],
+    ["indexedDB", "indexedDB" in window ? "可用" : "不可用"],
+    ["Cookie 数", String(document.cookie ? document.cookie.split(";").length : 0)],
+  ]);
+
+  /* ---- 静默采集清单 ---- */
+  const silentItems = [
+    ["navigator.userAgent / userAgentData", "已采集", "ok"],
+    ["navigator.platform / vendor", "已采集", "ok"],
+    ["navigator.languages / language", "已采集", "ok"],
+    ["navigator.hardwareConcurrency", "已采集", "ok"],
+    ["navigator.deviceMemory", mem ? "已采集" : "此浏览器不提供", "ok"],
+    ["navigator.maxTouchPoints", "已采集", "ok"],
+    ["navigator.connection（类型/带宽/RTT）", c ? "已采集" : "此浏览器不提供", "ok"],
+    ["navigator.pdfViewerEnabled", "已采集", "ok"],
+    ["navigator.doNotTrack / cookieEnabled", "已采集", "ok"],
+    ["screen.* / devicePixelRatio", "已采集", "ok"],
+    ["window.outer/innerWidth/Height", "已采集（视口分级）", "ok"],
+    ["Intl resolvedOptions（时区/日历/数字）", "已采集", "ok"],
+    ["mediaDevices.enumerateDevices", "已采集（数量）", "ok"],
+    ["navigator.permissions.query", "已采集", "ok"],
+    ["navigator.storage.estimate", "已采集", "ok"],
+    ["performance.memory / navigation timing", "已采集", "ok"],
+    ["document.visibilityState + activationStart", "已采集（hidden_at_load）", "ok"],
+    ["window.claudeAppBindings", "存在性检测", "ok"],
+    ["WebGL 渲染器 / vendor", "平台未自研采集", "info"],
+    ["AudioContext / OfflineAudioContext", "平台未自研采集", "info"],
+    ["Canvas 哈希 / toDataURL", "平台未自研采集（仅图像功能）", "info"],
+    ["字体枚举（measureText / fonts.check）", "平台未自研采集", "info"],
+    ["第三方指纹 SDK（FingerprintJS 等）", "未发现", "info"],
+  ];
+  $("#silent").innerHTML = `<table><thead><tr><th>信号</th><th>状态</th></tr></thead><tbody>${
+    silentItems.map(([k, v, t]) => `<tr><td>${k}</td><td>${pill(t === "ok" ? "ok" : "info")} <span style="color:var(--dim);font-size:11px">${v}</span></td></tr>`).join("")
+  }</tbody></table>`;
+
+  $("#stamp").textContent = "体检时间 " + new Date().toLocaleString();
+
+  // 保存供矩阵使用
+  window.__probe = { ro, offStr, form, ch, seq, auto, hidden, isClaudeApp };
+  renderMatrix(null);
+}
+
+/* ---- 出口检查 + 一致性矩阵 ---- */
+async function checkExit() {
+  const btn = $("#exit");
+  btn.disabled = true; btn.textContent = "查询中…";
+  let geo = null, err = null;
+  for (const url of ["https://ipwho.is/", "https://ipapi.co/json/"]) {
+    try {
+      const r = await fetch(url, { cache: "no-store" });
+      const j = await r.json();
+      if (url.includes("ipwho")) {
+        if (j.success === false) throw new Error(j.message || "ipwho 查询失败");
+        geo = { ip: j.ip, country: j.country_code, region: j.region, city: j.city, tz: j.timezone?.id, isp: j.connection?.isp, asn: j.connection?.asn };
+      } else {
+        geo = { ip: j.ip, country: j.country_code, region: j.region, city: j.city, tz: j.timezone, isp: j.org };
+      }
+      break;
+    } catch (e) { err = e; }
+  }
+  btn.disabled = false; btn.textContent = "检查出口 IP / 地区";
+  if (!geo) {
+    $("#net").insertAdjacentHTML("beforeend",
+      `<div class="row"><span class="k">出口查询</span><span class="v fail">失败：${err?.message || "未知"}</span></div>`);
+    return;
+  }
+  $("#net").insertAdjacentHTML("beforeend", `
+    <div class="row"><span class="k">出口 IP</span><span class="v">${geo.ip}</span></div>
+    <div class="row"><span class="k">出口国家 / 地区</span><span class="v">${dash(geo.country)} · ${dash(geo.region)} · ${dash(geo.city)}</span></div>
+    <div class="row"><span class="k">IP 时区</span><span class="v">${dash(geo.tz)}</span></div>
+    <div class="row"><span class="k">ISP / ASN</span><span class="v">${dash(geo.isp)} ${dash(geo.asn)}</span></div>`);
+  renderMatrix(geo);
+}
+
+/* 一致性矩阵：时区 / 语言 / 地区 / 平台 四方交叉 */
+function renderMatrix(geo) {
+  const p = window.__probe;
+  if (!p) return;
+  const { ro, offStr } = p;
+  const langs = (navigator.languages || []).join(",");
+  const rowsOut = [];
+
+  // 1. 系统时区 vs IP 时区
+  const sysTz = ro.timeZone || "—";
+  let tzOk = "info", tzNote = "未检查出口";
+  if (geo?.tz) {
+    // 用同一时刻在两个时区下的偏移差判断
+    const sameTz = normalizeTz(sysTz) === normalizeTz(geo.tz);
+    tzOk = sameTz ? "ok" : "bad";
+    tzNote = sameTz ? "一致" : `不一致（IP 为 ${geo.tz}）`;
+  }
+  rowsOut.push(["系统时区", `${sysTz}（UTC${offStr}）`, tzOk, tzNote]);
+
+  // 2. 语言 vs 地区
+  const langRegion = (navigator.language || "").split("-")[1] || "—";
+  let langOk = "info", langNote = "未检查出口";
+  if (geo?.country) {
+    const map = { TW: "TW", HK: "HK", CN: "CN", US: "US", JP: "JP", SG: "SG" };
+    const expect = map[geo.country] || geo.country;
+    const ok = langRegion.toUpperCase() === expect;
+    langOk = ok ? "ok" : "warn";
+    langNote = ok ? "一致" : `地区 ${geo.country}，语言地区却是 ${langRegion}`;
+  }
+  rowsOut.push(["浏览器语言地区", `${navigator.language}（列表 ${langs}）`, langOk, langNote]);
+
+  // 3. Accept-Language 无法直接读取，用 languages 顺序代替
+  const first = (navigator.languages || [])[0] || "—";
+  const second = (navigator.languages || [])[1] || "—";
+  rowsOut.push(["首选语言顺序", `${first} → ${second}`, "info",
+    first === navigator.language ? "与 navigator.language 一致" : "顺序与 language 不一致"]);
+
+  // 4. 平台串 vs 真实系统
+  const plat = (RE_PLATFORM.exec(navigator.userAgent) || [])[1] || "—";
+  rowsOut.push(["UA 平台串", plat, ALLOWED_PLATFORM.test(plat) ? "ok" : "bad",
+    ALLOWED_PLATFORM.test(plat) ? "在 Chrome 白名单内" : "不在白名单（会被标记 unreduced_platform）"]);
+
+  // 5. 屏幕 vs 视口
+  rowsOut.push(["screen == viewport", String(p.seq), p.seq ? "bad" : "ok",
+    p.seq ? "无头特征" : "正常窗口"]);
+
+  // 6. 客户端内运行
+  rowsOut.push(["是否在 Claude 客户端内", p.isClaudeApp ? "是" : "否", "info",
+    p.isClaudeApp ? "平台会看到 claudeAppBindings" : "纯浏览器环境"]);
+
+  // 7. 时区偏移合理性（是否有夏令时异常）
+  rowsOut.push(["UTC 偏移", offStr, "info", "与 IP 时区应能对上"]);
+
+  $("#matrix").querySelector("tbody").innerHTML = rowsOut.map(([k, v, t, note]) =>
+    `<tr><td>${k}</td><td class="mono">${v}</td><td>${pill(t)} <span style="color:var(--dim);font-size:11px">${note}</span></td></tr>`
+  ).join("");
+}
+
+function normalizeTz(tz) {
+  if (!tz) return "";
+  // 少数环境返回缩写，统一转成 IANA 比较
+  try {
+    return new Intl.DateTimeFormat("en", { timeZone: tz }).resolvedOptions().timeZone;
+  } catch { return tz; }
+}
+
+/* ---- 启动 ---- */
+$("#run").addEventListener("click", collect);
+$("#exit").addEventListener("click", checkExit);
+collect();
+</script>
+</body>
+</html>

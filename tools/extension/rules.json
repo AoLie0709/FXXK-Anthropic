@@ -1,0 +1,115 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Referer",
+          "operation": "remove"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||claude.ai",
+      "excludedInitiatorDomains": ["claude.ai", "anthropic.com"],
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "stylesheet",
+        "script",
+        "image",
+        "font",
+        "object",
+        "xmlhttprequest",
+        "ping",
+        "csp_report",
+        "media",
+        "websocket",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "transform": {
+          "queryTransform": {
+            "removeParams": [
+              "utm_source",
+              "utm_medium",
+              "utm_campaign",
+              "utm_term",
+              "utm_content",
+              "fbclid",
+              "gclid",
+              "mc_cid",
+              "mc_eid",
+              "_hsenc",
+              "_hsmi",
+              "tracking_id",
+              "msclkid",
+              "twclid",
+              "wickedid",
+              "_openstat",
+              "yclid",
+              "dclid",
+              "zanpid",
+              "igshid",
+              "ref",
+              "referrer",
+              "source"
+            ]
+          }
+        }
+      }
+    },
+    "condition": {
+      "urlFilter": "||claude.ai",
+      "resourceTypes": ["main_frame"]
+    }
+  },
+  {
+    "id": 3,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Accept-Language",
+          "operation": "set",
+          "value": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
+        }
+      ]
+    },
+    "condition": {
+      "requestDomains": [
+        "claude.ai",
+        "anthropic.com",
+        "hcaptcha.com",
+        "datadoghq.com",
+        "withpersona.com",
+        "persona.com"
+      ],
+      "resourceTypes": [
+        "main_frame",
+        "sub_frame",
+        "stylesheet",
+        "script",
+        "image",
+        "font",
+        "object",
+        "xmlhttprequest",
+        "ping",
+        "csp_report",
+        "media",
+        "websocket",
+        "other"
+      ]
+    }
+  }
+]

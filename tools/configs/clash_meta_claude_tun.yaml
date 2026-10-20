@@ -1,0 +1,55 @@
+# ========================================================
+# Claude 桌面端 & 微型 VM 防冲突专用配置 (Clash Meta / Mihomo)
+# 作用：
+# 1. 规避 Apple Virtualization (192.168.64.0/24, fc00::/7) TUN 冲突
+# 2. 封杀 IPv6 AAAA 穿透泄漏，避免国内双栈 IP 关联
+# 3. 拦截第三方遥测打点，定向保护业务流量
+# ========================================================
+
+# 1. TUN 配置推荐补丁 (在 tun 节点下合并)
+tun:
+  enable: true
+  stack: mixed # 或 gvisor
+  auto-route: true
+  auto-detect-interface: true
+  dns-hijack:
+    - any:53
+    - tcp://any:53
+  # 关键：必须排除 Apple Virtualization VM 网段与 DHCP 端口！
+  route-exclude-address:
+    - 192.168.64.0/24
+    - fc00::/7
+    - 127.0.0.0/8
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+
+# 2. DNS 纯净化与防泄漏配置 (在 dns 节点下合并)
+dns:
+  enable: true
+  ipv6: false # 强力阻断 AAAA 查询，防止国内 ISP IPv6 穿透！
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter:
+    - "*.lan"
+    - "localhost.ptlogin2.qq.com"
+    - "+.anthropic.com"
+    - "+.claude.ai"
+
+# 3. 分流规则清单 (在 rules 顶部注入)
+rules:
+  # Apple 虚拟化与本地沙盒服务直连
+  - IP-CIDR,192.168.64.0/24,DIRECT,no-resolve
+  - IP-CIDR6,fc00::/7,DIRECT,no-resolve
+
+  # Claude / Anthropic 核心业务 (必须走纯净节点)
+  - DOMAIN-SUFFIX,claude.ai,PROXIES
+  - DOMAIN-SUFFIX,anthropic.com,PROXIES
+  - DOMAIN-SUFFIX,claude.usercontent.com,PROXIES
+  - DOMAIN-SUFFIX,claudemcpcontent.com,PROXIES
+
+  # 人机验证与客户端证明依赖 (hCaptcha invisible)
+  - DOMAIN-SUFFIX,hcaptcha.com,PROXIES
+
+  # 可选：静默拦截非必要性能埋点 (减少设备特征上报)
+  # - DOMAIN,browser-intake-us5-datadoghq.com,REJECT
+  # - DOMAIN-SUFFIX,statsig.anthropic.com,PROXIES

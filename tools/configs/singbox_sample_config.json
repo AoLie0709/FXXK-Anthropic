@@ -1,0 +1,118 @@
+{
+  "$schema": "https://raw.githubusercontent.com/SagerNet/sing-box/main/schemas/config.json",
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+  "dns": {
+    "servers": [
+      {
+        "tag": "dns-remote",
+        "type": "tcp",
+        "server": "1.1.1.1",
+        "detour": "proxy"
+      },
+      {
+        "tag": "dns-direct",
+        "type": "udp",
+        "server": "223.5.5.5",
+        "detour": "direct"
+      }
+    ],
+    "rules": [
+      {
+        "domain_suffix": [
+          "claude.ai",
+          "anthropic.com",
+          "claudeusercontent.com",
+          "anthropic.ai",
+          "claudecdn.com",
+          "statsig.com",
+          "statsigapi.net",
+          "challenges.cloudflare.com"
+        ],
+        "query_type": [
+          "AAAA"
+        ],
+        "action": "predefined",
+        "rcode": "NOERROR"
+      },
+      {
+        "domain_suffix": [
+          "claude.ai",
+          "anthropic.com",
+          "claudeusercontent.com",
+          "anthropic.ai",
+          "claudecdn.com",
+          "statsig.com",
+          "statsigapi.net",
+          "challenges.cloudflare.com"
+        ],
+        "server": "dns-remote"
+      }
+    ],
+    "final": "dns-remote"
+  },
+  "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "interface_name": "utun99",
+      "address": [
+        "172.19.0.1/30"
+      ],
+      "auto_route": true,
+      "strict_route": false,
+      "stack": "mixed"
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "socks",
+      "tag": "proxy",
+      "server": "127.0.0.1",
+      "server_port": 10811
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    },
+    {
+      "type": "block",
+      "tag": "block"
+    }
+  ],
+  "route": {
+    "default_domain_resolver": "dns-direct",
+    "rules": [
+      {
+        "action": "sniff"
+      },
+      {
+        "domain_suffix": [
+          "claude.ai",
+          "anthropic.com",
+          "claudeusercontent.com",
+          "anthropic.ai",
+          "claudecdn.com",
+          "statsig.com",
+          "statsigapi.net",
+          "challenges.cloudflare.com"
+        ],
+        "ip_version": 6,
+        "action": "reject"
+      },
+      {
+        "domain_suffix": [
+          "claude.ai",
+          "anthropic.com",
+          "claudeusercontent.com",
+          "anthropic.ai",
+          "claudecdn.com"
+        ],
+        "outbound": "proxy"
+      }
+    ],
+    "final": "proxy"
+  }
+}

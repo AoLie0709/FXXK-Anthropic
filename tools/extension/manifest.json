@@ -1,0 +1,101 @@
+{
+  "manifest_version": 3,
+  "name": "Claude 隐私护盾 (Claude Shield)",
+  "version": "1.5.0",
+  "description": "为 Claude.ai 打造的智能隐私与防关联护盾：自动识别并对齐 VPN 节点时区语言、WebRTC 防泄漏、硬件指纹微噪、真实遥测流净化与账号封禁诊断",
+  "permissions": [
+    "privacy",
+    "storage",
+    "declarativeNetRequest",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://claude.ai/*",
+    "https://*.anthropic.com/*",
+    "https://*.withpersona.com/*",
+    "https://*.persona.com/*",
+    "https://*.hcaptcha.com/*",
+    "https://bewild.ai/*",
+    "https://*.bewild.ai/*",
+    "https://browserleaks.com/*",
+    "https://*.browserleaks.com/*",
+    "https://iphey.com/*",
+    "https://*.iphey.com/*",
+    "https://whoer.net/*",
+    "https://*.whoer.net/*",
+    "https://ipwho.is/*",
+    "https://freeipapi.com/*",
+    "https://cloudflare.com/*",
+    "https://1.1.1.1/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://claude.ai/*",
+        "https://*.anthropic.com/*",
+        "https://*.withpersona.com/*",
+        "https://*.persona.com/*",
+        "https://*.hcaptcha.com/*",
+        "https://bewild.ai/*",
+        "https://*.bewild.ai/*",
+        "https://browserleaks.com/*",
+        "https://*.browserleaks.com/*",
+        "https://iphey.com/*",
+        "https://*.iphey.com/*",
+        "https://whoer.net/*",
+        "https://*.whoer.net/*"
+      ],
+      "js": ["inject.js"],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true,
+      "match_about_blank": true
+    },
+    {
+      "matches": [
+        "https://claude.ai/*",
+        "https://*.anthropic.com/*",
+        "https://*.withpersona.com/*",
+        "https://*.persona.com/*",
+        "https://*.hcaptcha.com/*",
+        "https://bewild.ai/*",
+        "https://*.bewild.ai/*",
+        "https://browserleaks.com/*",
+        "https://*.browserleaks.com/*",
+        "https://iphey.com/*",
+        "https://*.iphey.com/*",
+        "https://whoer.net/*",
+        "https://*.whoer.net/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": true
+    }
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "ruleset_claude",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "dns": {
+    "rules": [
+      {
+        "domain_suffix": [
+          "claude.ai",
+          "anthropic.com",
+          "claudeusercontent.com",
+          "anthropic.ai",
+          "claudecdn.com",
+          "statsig.com",
+          "statsigapi.net",
+          "challenges.cloudflare.com"
+        ],
+        "query_type": [
+          "AAAA"
+        ],
+        "action": "predefined",
+        "rcode": "NOERROR"
+      }
+    ]
+  },
+  "route": {
+    "rules": [
+      {
+        "domain_suffix": [
+          "claude.ai",
+          "anthropic.com",
+          "claudeusercontent.com",
+          "anthropic.ai",
+          "claudecdn.com",
+          "statsig.com",
+          "statsigapi.net",
+          "challenges.cloudflare.com"
+        ],
+        "ip_version": 6,
+        "action": "reject"
+      }
+    ]
+  }
+}

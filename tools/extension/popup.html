@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude 隐私护盾</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- 头部区域 -->
+    <header class="header">
+      <div class="logo-area">
+        <span class="logo-icon">🛡️</span>
+        <div>
+          <h1 class="logo-title">Claude 隐私护盾 <span id="extVersion" style="font-size:11px;font-weight:600;color:#38bdf8;background:rgba(56,189,248,0.14);padding:1px 6px;border-radius:4px;margin-left:4px;vertical-align:middle;">v1.5.0</span></h1>
+          <span class="subtext">VPN 节点智能对齐 · 全真遥测净化 · 封禁诊断</span>
+        </div>
+      </div>
+      <div class="status-badge" id="globalStatus">● 运行中</div>
+    </header>
+
+    <!-- 实时出口环境卡片 -->
+    <div class="live-node-card">
+      <div class="card-top">
+        <div class="node-title">
+          <span id="nodeFlag">🌐</span>
+          <span id="nodeLocation">正在探测当前 VPN 出口...</span>
+        </div>
+        <button class="btn-refresh" id="btnRefreshNode" title="重新检测当前节点">🔄 重新识别</button>
+      </div>
+      <div class="node-grid">
+        <div class="node-item">
+          <span class="label">出口 IP</span>
+          <span class="value" id="nodeIp">--</span>
+        </div>
+        <div class="node-item">
+          <span class="label">运行环境时区</span>
+          <span class="value" id="nodeTimezone">--</span>
+        </div>
+        <div class="node-item">
+          <span class="label">语言首选项</span>
+          <span class="value" id="nodeLang">--</span>
+        </div>
+        <div class="node-item">
+          <span class="label">运营商 / ASN</span>
+          <span class="value" id="nodeIsp">--</span>
+        </div>
+      </div>
+      <div class="node-status-bar">
+        <span class="status-dot"></span>
+        <span class="status-text" id="syncStatus">环境已与当前节点毫秒级对齐</span>
+      </div>
+    </div>
+
+    <!-- 🩺 账号健康度与封禁/申诉诊断台 -->
+    <div class="standing-card" id="standingCard">
+      <div class="standing-top">
+        <div class="standing-title">
+          <span>🩺 账号健康度与封禁/申诉诊断台</span>
+        </div>
+        <span class="standing-badge badge-neutral" id="standingBadge">待检测</span>
+      </div>
+
+      <button class="btn-check-standing" id="btnCheckStanding">🔍 立即检测账号状态与封禁原因</button>
+
+      <div class="standing-list" id="standingList">
+        <div class="standing-row">
+          <span class="st-label">账号状态</span>
+          <span class="st-value" id="stStanding">点击上方按钮或在 Claude 页面自动捕获</span>
+        </div>
+        <div class="standing-row">
+          <span class="st-label">封禁分类与原因</span>
+          <span class="st-value" id="stBanReason">--</span>
+        </div>
+        <div class="standing-row">
+          <span class="st-label">封禁时间 / 原套餐</span>
+          <span class="st-value" id="stBannedAtTier">--</span>
+        </div>
+        <div class="standing-row">
+          <span class="st-label">受影响组织</span>
+          <span class="st-value" id="stBannedOrgs">--</span>
+        </div>
+        <div class="standing-row">
+          <span class="st-label">申诉进度</span>
+          <span class="st-value" id="stAppealStatus">--</span>
+        </div>
+        <div class="standing-row">
+          <span class="st-label">导出与账单状态</span>
+          <span class="st-value" id="stExportBilling">--</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模式选择 -->
+    <div class="section-title">伪装画像模式</div>
+    <div class="persona-cards">
+      <label class="persona-card" id="cardAuto">
+        <input type="radio" name="mode" value="auto" checked>
+        <div class="card-content">
+          <div class="card-header">
+            <span class="card-title">⚡ 智能对齐当前 VPN</span>
+            <span class="tag tag-recommend">推荐</span>
+          </div>
+          <div class="card-desc">自动检测节点出口 IP、时区与语言，动态热更新，零时区偏差</div>
+        </div>
+      </label>
+
+      <label class="persona-card" id="cardTaiwan">
+        <input type="radio" name="mode" value="taiwan">
+        <div class="card-content">
+          <div class="card-header">
+            <span class="flag">🇹🇼</span>
+            <span class="card-title">固定台湾专线</span>
+            <span class="tag">HiNet AS3462</span>
+          </div>
+          <div class="card-desc">Asia/Taipei (UTC+8) · 繁体中文 (zh-TW)</div>
+        </div>
+      </label>
+
+      <label class="persona-card" id="cardUS">
+        <input type="radio" name="mode" value="us">
+        <div class="card-content">
+          <div class="card-header">
+            <span class="flag">🇺🇸</span>
+            <span class="card-title">固定美国原生</span>
+            <span class="tag">Pacific UTC-7</span>
+          </div>
+          <div class="card-desc">America/Los_Angeles · 英文 (en-US)</div>
+        </div>
+      </label>
+    </div>
+
+    <!-- 防护状态明细 (极简紧凑) -->
+    <div class="section-title">主动防护模块 (v1.5.0 全维反探针矩阵)</div>
+    <div class="shields-compact">
+      <div class="shield-tag">
+        <span class="shield-check">✓</span> about:blank Iframe 同步 Realm 装甲
+      </div>
+      <div class="shield-tag">
+        <span class="shield-check">✓</span> 第一方/第三方 RUM 压缩流源头洗白
+      </div>
+      <div class="shield-tag">
+        <span class="shield-check">✓</span> dcz=keep 字典追踪剥离 & spa:locale 对齐
+      </div>
+      <div class="shield-tag">
+        <span class="shield-check">✓</span> 交互直方图拟真 & 全类型语言标头焊死
+      </div>
+    </div>
+
+    <!-- 快捷操作区 -->
+    <div class="actions">
+      <button class="btn btn-primary" id="btnOpenClaude">🚀 进入 Claude.ai</button>
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="btnTestYouClaude">🧪 YouClaude 风险体检</button>
+        <button class="btn btn-secondary" id="btnTestBewild">🛡️ Bewild 环境检测</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="btnTestLeak">🧪 WebRTC 泄漏测试</button>
+        <button class="btn btn-secondary" id="btnTestIp">🔍 指纹信誉检测</button>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <span>Claude Shield v1.5.0 · 全真遥测流模拟与封禁诊断装甲</span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
