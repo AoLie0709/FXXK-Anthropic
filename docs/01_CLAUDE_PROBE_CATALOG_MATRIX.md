@@ -126,6 +126,7 @@
 | **B-P3** | **账号注销与账单锁**<br>`GET /api/account/deletion-allowed` | 返回 `{"deletable": false, "reasons": ["active_billing"]}`。当苹果 IAP 或 Stripe 订阅处于活跃计费周期内，强制锁死删号权限，防止被风控用户“注销重练”。 | 🟢 **高** | HAR-2 `[201]` 明文提取。 |
 | **B-P4** | **合规数据导出闸门**<br>`export_policy` | 评估用户提取历史数据权限：<br>`"allow"` 开放 `/api/account/export_data` 打包下载全部对话；`"profile_only"` 仅允许导出个人基本资料。 | 🟢 **高** | HAR 报文 AST `Rc()` / `Jc()` 组件渲染证实。 |
 | **B-P5** | **申诉页 hCaptcha 算力收敛** | 提交申诉表单前强制执行 `hsw.js`，以极高安全等级采集申诉者的浏览器指纹与算力证明，若检测到环境仍为代理或指纹变异，申诉甚至无法成功 Post。 | 🟢 **高** | HAR-1 `[202~209]`。 |
+| **B-P6** | **F12 开发者工具与反调试探针**<br>`screen_equals_viewport` | 申诉与受限页面实施反调试与控制台嗅探：<br>• `screen_equals_viewport`: 动态比对屏幕分辨率与视口尺寸（`outerWidth/outerHeight` vs `innerWidth/innerHeight`），打开 F12 控制台必然导致视口突变而返回 `false`；<br>• 定时器触发 `debugger` 陷阱，探测 DevTools 是否被拉起；<br>• 发现审查元素行为直接标记对抗风险。 | 🟢 **高** | HAR-1 `[211]`, HAR-4 `[203]` 实录 `screen_equals_viewport: false`；AST 反编译反调试逻辑。 |
 
 ---
 
